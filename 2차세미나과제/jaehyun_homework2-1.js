@@ -11,7 +11,10 @@ const server = http.createServer(function(req, res) {
     let hashAlgorithm = crypto.createHash('sha512');
     let hashing = hashAlgorithm.update(queryparse.str);
     let hashedString = hashing.digest('base64');
-
+    
+    if (req.url === '/favicon.ico'){
+        return;
+        }
     const result = {
         "hashed": "",
         "msg": "fail"
@@ -20,8 +23,6 @@ const server = http.createServer(function(req, res) {
         result.hashed = queryparse.str;
         result.msg = "success"
     }
-
-
     crypto.randomBytes(32, function(err, buffer) {
         if (err) {
             console.log(err);
@@ -39,13 +40,10 @@ const server = http.createServer(function(req, res) {
                         msg: result.msg,
                         hashed: hashed.toString("base64")
                     }));
-
                 }
             });
         }
     });
-
-
 });
 server.listen(3000, function() {
     console.log('connected 3000 port!!');
