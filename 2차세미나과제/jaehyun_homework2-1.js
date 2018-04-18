@@ -11,7 +11,7 @@ const server = http.createServer(function(req, res) {
     let hashAlgorithm = crypto.createHash('sha512');
     let hashing = hashAlgorithm.update(queryparse.str);
     let hashedString = hashing.digest('base64');
-    
+    //파비콘 거르기
     if (req.url === '/favicon.ico'){
         return;
         }
