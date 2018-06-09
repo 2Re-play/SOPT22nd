@@ -7,6 +7,8 @@ var logger = require('morgan');
 var store = require('./routes/store.js')
 var bookmark = require('./routes/bookmark.js');
 var main = require('./routes/main.js');
+var signup = require('./routes/signup.js');
+var signin = require('./routes/signin.js');
 var app = express();
 
 // view engine setup
@@ -23,6 +25,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/store', store);
 app.use('/bookmark', bookmark);
 app.use('/main', main);
+app.use('/signup', signup);
+app.use('/signin', signin);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
