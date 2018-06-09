@@ -1,5 +1,5 @@
 
-/*  localhost:3000/store  */
+/*  localhost:3030/store  */
 /*  가게 등록 + 특정 가게 (메뉴, 정보, 리뷰) + 가게 리뷰 등록 */
 
 
@@ -15,79 +15,79 @@ const upload = require('../config/multer.js');
 // url : localhost:3000/store , method : POST
 router.post(('/'), upload.array('store_image'), async function(req, res) {
   let category = req.body.category;
-	let store_name = req.body.store_name;
+  let store_name = req.body.store_name;
   let store_info = req.body.store_info;
 
   let store_image = null;
   let menu = req.body.menu;
   let numOfMenu = 0;
 
-
-	let taskArray = [
+  let taskArray = [
     // 1. Null Value Check
-		function(callback) {
+    function(callback) {
 
-      if(!menu){
-        store_image = req.files[0].location;
+      if (!store_name || !store_info) { 
+        res.status(400).send({
+          'message' : "Null Value Error"
+        });
+        callback("Null Value Error");
       } else {
-        numOfMenu = menu.length;
-      }
 
-  	  if (!store_name || !store_info ){ //|| !menu) { 
-				res.status(400).send({
-					message : "Null Value Error"
-				});
-				callback("Null Value Error");
-			} else {
-				callback(null);
-			}
-		},
+        if (req.files) {
+          store_image = req.files[0].location;
+        }
+        if (menu) {
+          numOfMenu = menu.length;
+        }
+        callback(null);
+      }
+    },
 
     // 2. get connection in pool
-		function(callback) {
+    function(callback) {
       pool.getConnection(function(err, connection) {
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Get Connection"
+            'message' : "Internal Server Error - Get Connection"
           });
           callback("pool.getConnection Error : " + err);
         } else {
-        	callback(null, connection);
+          callback(null, connection);
         }
       });
     },
 
     // 3. insert store
     function(connection, callback) {
-    	let insertStoreItemQuery = 'INSERT INTO store (category, store_name, store_info, store_image) VALUES (?, ?, ?, ?)';
-    	
+      let insertStoreItemQuery = 'INSERT INTO store (category, store_name, store_info, store_image) VALUES (?, ?, ?, ?)';
+      
       connection.query(insertStoreItemQuery, [category, store_name, store_info, store_image], function(err, result) {
-    		if (err) {
+        if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Insert Store"
+            'message' : "Internal Server Error - Insert Store"
           });
           callback("connection.query Error : " + err);
         } else {
-        	callback(null, connection);
+          callback(null, connection);
         }
-    	});
+      });
 
     },
 
     // 4. select store_idx
     function(connection, callback) { 
 
-      let countStoreQuery = 'SELECT count(*) as c FROM store'; 
+      let countStoreQuery = 'SELECT store_idx FROM store ORDER BY writing_time DESC limit 1'; 
 
       connection.query(countStoreQuery, function(err, result) {
 
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Select Store Index"
+            'message' : "Internal Server Error - Select Store Index"
           });
           callback("connection.query Error : " + err);
         } else {
-          store_idx = result[0].c;
+          store_idx = result[0].store_idx;
           callback(null, connection, store_idx);
         }
 
@@ -104,7 +104,7 @@ router.post(('/'), upload.array('store_image'), async function(req, res) {
           connection.query(insertMenuItemQuery, [store_idx, menu[i][0], menu[i][1]], function(err, result) {
             if (err) {
               res.status(500).send({
-                message : "Internal Server Error - Insert Menu"
+                'message' : "Internal Server Error - Insert Menu"
               });
               callback("connection.query Error : " + err);
             }
@@ -114,20 +114,21 @@ router.post(('/'), upload.array('store_image'), async function(req, res) {
 
         callback(null, connection, "Successfully Insert Store & Menu");
     }
-	];
+  ];
 
 
-	async.waterfall(taskArray, function(err, connection, result) {
-		if (err) {
-			console.log(err);
-		} else {
-			console.log(result);
+  async.waterfall(taskArray, function(err, connection, message) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log(message);
       res.status(201).send({
-        message : "Successfully Insert Store & Menu"
+        'message' : message
       });
+
       connection.release();
-		}
-	});
+    }
+  });
   
 });
 
@@ -138,7 +139,6 @@ router.post(('/'), upload.array('store_image'), async function(req, res) {
 router.get(('/menu/:store_idx'), function(req, res) {
 
   var store_idx = req.params.store_idx;
-  console.log(store_idx);
 
   let taskArray = [
     // 1. get connection in pool
@@ -146,7 +146,7 @@ router.get(('/menu/:store_idx'), function(req, res) {
       pool.getConnection(function(err, connection) {
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Get Connection"
+            'message' : "Internal Server Error - Get Connection"
           });
           callback("pool.getConnection Error : " + err);
         } else {
@@ -161,32 +161,30 @@ router.get(('/menu/:store_idx'), function(req, res) {
       connection.query(selectMenuItemsQuery, [store_idx], function(err, result) {
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Select Menu List"
+            'message' : "Internal Server Error - Select Menu List"
           });
           callback("connection.query Error : " + err);
-        // } else if (result.length === 0) {
-        //   res.status(400).send({
-        //     message : "I have no MENU"
-        //   });
-        //   callback(null, "I have no MENU");
         } else {
-          res.status(200).send({
-            message : "Successfully Get Menu List",
-            data : result  
-          });
-          callback(null, "Successfully Get Menu List");
+          callback(null, connection, result, "Successfully Get Menu List");
         }
-        connection.release();     // connection 반환
+        
       });
     }
   ];
 
-  async.waterfall(taskArray, function(err, result) {
+  async.waterfall(taskArray, function(err, connection, result, message) {
     if (err) {
       console.log(err);
     } else {
-      console.log(result);
+      console.log(message);
+
+      res.status(200).send({
+        'message' : message,
+        'data' : result  
+      });
     }
+
+    connection.release();     // connection 반환
   });
 });
 
@@ -197,7 +195,6 @@ router.get(('/menu/:store_idx'), function(req, res) {
 router.get(('/info/:store_idx'), function(req, res) {
 
   var store_idx = req.params.store_idx;
-  console.log(store_idx);
 
   let taskArray = [
     // 1. get connection in pool
@@ -205,7 +202,7 @@ router.get(('/info/:store_idx'), function(req, res) {
       pool.getConnection(function(err, connection) {
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Get Connection"
+            'message' : "Internal Server Error - Get Connection"
           });
           callback("pool.getConnection Error : " + err);
         } else {
@@ -220,27 +217,30 @@ router.get(('/info/:store_idx'), function(req, res) {
       connection.query(selectStoreInfoItemsQuery, [store_idx, store_idx], function(err, result) {
         if (err) {
           res.status(500).send({
-            message : "Internal Server Error - Select Store Info"
+            'message' : "Internal Server Error - Select Store Info"
           });
           callback("connection.query Error : " + err);
         } else {
-          res.status(200).send({
-            message : "Successfully Get Store Info",
-            data : result  
-          });
-          callback(null, "Successfully Get Store Info");
+          
+          callback(null, connection, result, "Successfully Get Store Info");
         }
-        connection.release();     // connection 반환
       });
     }
   ];
 
-  async.waterfall(taskArray, function(err, result) {
+  async.waterfall(taskArray, function(err, connection, result, message) {
     if (err) {
       console.log(err);
     } else {
-      console.log(result);
+      console.log(message);
+
+      res.status(200).send({
+        'message' : message,
+        'data' : result  
+      });
     }
+
+    connection.release();     // connection 반환
   });
 });
 
@@ -284,13 +284,50 @@ router.get(('/review/:store_idx'), function(req, res){
 
 
 
+/*** 특정 가게 (리뷰) ***/
+// uri : localhost:3030/store/review/:store_idx , method : GET
+router.get(('/review/:store_idx'), function(req, res){
+  
+    let store_idx = req.params.store_idx;
+    pool.getConnection(function(err, connection){
+        if(err){
+            res.status(500).send({
+                message : "Internal Server Error"
+            });
+            connection.release();
+        } else{
+            let sql = "SELECT review_content, review_image, writing_time, user_id "+
+            "FROM review,user "+
+            "WHERE store_idx =?"+
+            " ORDER BY writing_time DESC";
+            connection.query(sql, [store_idx], function(err, result){
+            if(err){
+                res.status(400).send({
+                    message : "store_idx error"
+                });
+                connection.release();
+            } else {
+                console.log(result)
+                res.status(200).send({
+                    data : result
+                });
+                connection.release();
+                console.log("Successfully SELECT Review Data");
+                 }
+            })
+        };
+    });
+});
+
+
+
 /*** 가게 리뷰 등록 ***/
-// url : localhost:3000/store/review , method : POST
-router.post(('/review'), upload.array('review_image'), function(req, res) {
+// uri : localhost:3030/store/review , method : POST
+router.post(('/review/:store_idx'), upload.array('review_image'), function(req, res) {
 
     let user_idx= req.body.user_idx;
     let review_image = req.files[0].location;
-    let store_idx = req.body.store_idx;
+    let store_idx = req.params.store_idx;
     let review_content =  req.body.review_content;
     pool.getConnection(function(err, connection){
         if(err){
@@ -310,7 +347,7 @@ router.post(('/review'), upload.array('review_image'), function(req, res) {
                 let sql = "INSERT INTO review ( review_content, review_image, store_idx, user_idx) VALUE(?,?,?,?)";
                 connection.query(sql,[review_content,review_image, store_idx, user_idx] ,function (err, result) {
                 if (err){
-                    res.status(500).send({
+                    res.status(400).send({
                         message : "parameter error"
                     });
                     connection.release();

@@ -3,9 +3,9 @@ const pool = require('../config/dbPool.js');
 const router = express.Router();
 
 //북마크 post
-router.post('/', function(req, res) {
+router.post('/:store_idx', function(req, res) {
     let user_idx = req.body.user_idx;
-    let store_idx =  req.body.store_idx;
+    let store_idx =  req.params.store_idx;
     pool.getConnection(function(err,connection){
         if(err){
             res.status(500).send({
@@ -19,7 +19,7 @@ router.post('/', function(req, res) {
                 connection.release();
                 console.log("user_idx, store_idx error");
             } else {
-                let sql = "INSERT INTO bookmark(user_user_idx, store_store_idx) VALUES (?,?)";
+                let sql = "INSERT INTO bookmark(user_idx, store_idx) VALUES (?,?)";
                 connection.query(sql,[user_idx, store_idx], function (err, result) {
                     if (err){
                         res.status(500).send({
@@ -39,10 +39,9 @@ router.post('/', function(req, res) {
         }
     })
 });
-//북마크 보기
-router.get('/:user_idx/:store_idx', function(req, res){
+//북마크 리스트 보기
+router.get('/:user_idx', function(req, res){
     let user_idx = req.params.user_idx;
-    let store_idx = req.params.store_idx;
     pool.getConnection(function(err, connection){
         if(err){
             res.status(500).send({
@@ -56,10 +55,13 @@ router.get('/:user_idx/:store_idx', function(req, res){
                 connection.release();
                 console.log("user_idx, store_idx Does not exist.")
             }else {
-                let sql = "SELECT DISTINCT store_name, menu_name,(SELECT count(*) FROM review WHERE store_idx = ?) as review_count "+
-                "FROM menu JOIN( bookmark JOIN store USING(store_idx)) USING(store_idx) "+
-                "WHERE bookmark.store_idx =? AND bookmark.user_idx =?";
-      connection.query(sql,[store_idx, store_idx, user_idx], function(err, result){
+                let sql = "SELECT DISTINCT store_name, "+ 
+                "GROUP_CONCAT( menu_name SEPARATOR ',') AS menu_name, "+
+                "(SELECT count(*) FROM review as r  WHERE r.store_idx = b.store_idx) AS review_count "+ 
+                "FROM menu JOIN( bookmark AS b  JOIN store USING(store_idx)) USING(store_idx) "+
+                "WHERE b.user_idx = ? "+ 
+                "GROUP BY b.store_idx";
+      connection.query(sql,[user_idx], function(err, result){
             if (err){
                 res.status(500).send({
                     message : "Bookmark parameter GET ERROR"
